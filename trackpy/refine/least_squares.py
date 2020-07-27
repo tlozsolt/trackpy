@@ -842,9 +842,12 @@ def refine_leastsq(f, reader, diameter, separation=None, fit_function='gauss',
                 residual, jacobian = ff.get_residual(sub_images, meshes, masks,
                                                      params, groups, norm)
 
-                result = minimize(residual, vect, bounds=f_bounds,
-                                  constraints=f_constraints, jac=jacobian,
-                                  **_kwargs)
+                try: result = minimize(residual, vect, bounds=f_bounds,
+                                       constraints=f_constraints, jac=jacobian,
+                                       **_kwargs)
+                except ValueError:
+                    print("Warning, ValueError encountered, likely in minimize due to out of bounds during function minimization")
+                    break
                 if not result['success']:
                     raise RefineException(result['message'])
 
@@ -871,7 +874,13 @@ def refine_leastsq(f, reader, diameter, separation=None, fit_function='gauss',
             # 3rd Ed. , equation (8.11)
             if compute_error:
                 hessian = Hessian(residual)(result['x'])
-                result_std = np.sqrt(2 * np.diag(np.linalg.inv(hessian)))
+                try: result_std = np.sqrt(2 * np.diag(np.linalg.inv(hessian)))
+                except np.linalg.LinAlgError as err:
+                    if 'Singular matrix' in str(err):
+                        print("Hessian is singular during computation of error. Setting value to NAN")
+                        result_std = np.nan
+                        raise RefineException('Hessian is singular during computation of error. Setting value to NAN')
+                    else: raise
                 params_std = vect_to_params(result_std,
                                             np.empty((len(params),
                                                       len(modes_std))),
@@ -885,7 +894,8 @@ def refine_leastsq(f, reader, diameter, separation=None, fit_function='gauss',
             else:
                 f.loc[f_iter.index, 'cost'] = np.nan
                 if compute_error:
-                    f[f_iter.index, cols_std] = np.nan
+                    #f[f_iter.index, cols_std] = np.nan
+                    f.loc[f_iter.index, cols_std] = np.nan
             logger.warn('RefineException: {}'.format(e.args))
             status = 'failed'
         else:
