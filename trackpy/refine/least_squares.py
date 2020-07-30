@@ -835,6 +835,7 @@ def refine_leastsq(f, reader, diameter, separation=None, fit_function='gauss',
             f_constraints = _wrap_constraints(constraints, params, ff.modes,
                                               groups)
             f_bounds = ff.compute_bounds(bounds, params, groups)
+            global rms_dev
             for _n_iter in range(max_iter):
                 sub_images, meshes, masks = prepare_subimages(coords, groups,
                                                               frame_nos, frames,
@@ -847,7 +848,7 @@ def refine_leastsq(f, reader, diameter, separation=None, fit_function='gauss',
                                        **_kwargs)
                 except ValueError:
                     print("Warning, ValueError encountered, likely in minimize due to out of bounds during function minimization")
-                    break
+                    result = minimize(residual,vect, bounds=None, constraints=f_constraints, jac=jacobian, **_kwargs)
                 if not result['success']:
                     raise RefineException(result['message'])
 
